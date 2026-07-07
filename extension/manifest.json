@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "Clickbait Detector",
+  "version": "0.1.0",
+  "description": "Evaluates headline accuracy using a local LLM via KoboldCPP.",
+
+  "permissions": [
+    "cookies",
+    "storage",
+    "scripting",
+    "contextMenus"
+  ],
+
+  "host_permissions": [
+    "https://*.reddit.com/*",
+    "https://*.seznam.cz/*",
+    "https://news.ycombinator.com/*",
+    "https://*/*"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.reddit.com/*",
+        "https://old.reddit.com/*",
+        "https://www.seznam.cz/*",
+        "https://zpravy.seznam.cz/*",
+        "https://news.ycombinator.com/*"
+      ],
+      "js": ["content/scanner.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["debug/debug.html", "debug/debug.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
+  },
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

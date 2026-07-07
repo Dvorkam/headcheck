@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      color: #333;
+      width: 260px;
+      background: #fff;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px 10px;
+      border-bottom: 0.5px solid #eee;
+    }
+    .header-title { font-size: 14px; font-weight: 500; }
+    .header-sub { font-size: 11px; color: #999; margin-top: 1px; }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ccc; flex-shrink: 0;
+    }
+    .status-dot.ok  { background: #639922; }
+    .status-dot.err { background: #E24B4A; }
+
+    .section { padding: 10px 14px; border-bottom: 0.5px solid #f0f0f0; }
+    .section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #aaa; margin-bottom: 8px;
+    }
+
+    /* Category rows */
+    .cat-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 3px 0; font-size: 12px;
+    }
+    .cat-badge {
+      display: inline-block; padding: 1px 7px; border-radius: 10px;
+      font-size: 11px; font-weight: 500; line-height: 1.6;
+    }
+    .cat-count { color: #888; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .cat-bar-wrap { flex: 1; margin: 0 8px; height: 3px; background: #f0f0f0; border-radius: 2px; }
+    .cat-bar { height: 100%; border-radius: 2px; transition: width 0.3s; }
+
+    /* Empty state */
+    .empty { color: #bbb; font-size: 12px; text-align: center; padding: 8px 0; }
+
+    /* Footer links */
+    .footer {
+      display: flex; gap: 0; border-top: 0.5px solid #eee;
+    }
+    .footer a {
+      flex: 1; text-align: center; padding: 9px 0; font-size: 11px;
+      color: #888; text-decoration: none; cursor: pointer;
+      border-right: 0.5px solid #eee;
+    }
+    .footer a:last-child { border-right: none; }
+    .footer a:hover { background: #f9f9f9; color: #333; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .toggle-label { font-size: 12px; color: #555; }
+    .toggle {
+      position: relative; width: 32px; height: 18px;
+      display: inline-block; cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: #ddd;
+      border-radius: 9px; transition: background 0.2s;
+    }
+    .slider::before {
+      content: ""; position: absolute; width: 12px; height: 12px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    input:checked + .slider { background: #639922; }
+    input:checked + .slider::before { transform: translateX(14px); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Clickbait Detector</div>
+    <div class="header-sub" id="page-domain">—</div>
+  </div>
+  <div id="status-dot" class="status-dot"></div>
+</div>
+
+<div class="section">
+  <div class="toggle-row">
+    <span class="toggle-label">Active on this site</span>
+    <label class="toggle">
+      <input type="checkbox" id="site-toggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
+
+<div class="section" id="stats-section">
+  <div class="section-label">This page</div>
+  <div id="stats-rows"><div class="empty">No links evaluated yet</div></div>
+</div>
+
+<div class="footer">
+  <a id="btn-options">Settings</a>
+  <a id="btn-debug">Debug log</a>
+  <a id="btn-clear">Clear cache</a>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

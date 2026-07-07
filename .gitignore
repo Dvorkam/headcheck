@@ -1,0 +1,8 @@
+bench/data/raw/
+bench/data/results/
+__pycache__/
+*.pyc
+.DS_Store
+*:Zone.Identifier
+node_modules/
+*.egg-info/

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Headcheck — Debug Log</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace; font-size: 13px; background: #f8f8f6; color: #333; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      background: #fff; border-bottom: 1px solid #e0e0e0;
+      padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    }
+    .toolbar h1 { font-size: 14px; font-weight: 500; margin-right: auto; }
+    .toolbar button { font-size: 12px; padding: 4px 12px; border: 1px solid #ccc; border-radius: 5px; background: #fff; cursor: pointer; }
+    .toolbar button:hover { background: #f0f0f0; }
+    .toolbar button.danger { border-color: #e24b4a; color: #a32d2d; }
+    .count { font-size: 12px; color: #999; }
+
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 16px; background: #fff; border-bottom: 1px solid #eee; }
+    .filter-btn { font-size: 11px; padding: 3px 10px; border-radius: 12px; border: 1px solid #ddd; background: #fff; cursor: pointer; color: #666; }
+    .filter-btn.active { background: #333; color: #fff; border-color: #333; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th { position: sticky; top: 57px; background: #f0f0ee; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 10px; text-align: left; border-bottom: 1px solid #ddd; color: #666; }
+    tbody tr { border-bottom: 1px solid #eee; }
+    tbody tr:hover { background: #fafaf8; }
+    td { padding: 6px 10px; vertical-align: top; }
+
+    .ts { color: #bbb; font-size: 11px; white-space: nowrap; }
+    .type-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+
+    .t-detected    { background: #f1f1f1; color: #888; }
+    .t-queued      { background: #e6f1fb; color: #185fa5; }
+    .t-fetch_ok    { background: #eaf3de; color: #3b6d11; }
+    .t-fetch_error { background: #fcebeb; color: #a32d2d; }
+    .t-llm_input   { background: #faeeda; color: #854f0b; }
+    .t-llm_output  { background: #e1f5ee; color: #0f6e56; }
+    .t-llm_error   { background: #fcebeb; color: #a32d2d; }
+    .t-parse_ok    { background: #eaf3de; color: #3b6d11; }
+    .t-parse_fail  { background: #fcebeb; color: #a32d2d; }
+    .t-cache_hit   { background: #eeedfe; color: #534ab7; }
+    .t-badge_shown { background: #eaf3de; color: #3b6d11; }
+    .t-badge_skip  { background: #f1f1f1; color: #888; }
+
+    .headline { font-size: 12px; color: #555; max-width: 280px; }
+    .url-cell { font-size: 11px; color: #999; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .detail-toggle { font-size: 11px; color: #aaa; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .detail-toggle:hover { color: #555; }
+    .detail-box {
+      display: none; margin-top: 6px;
+      background: #f5f5f3; border: 1px solid #e0e0e0; border-radius: 4px;
+      padding: 8px; font-size: 11px; line-height: 1.5; color: #444;
+      white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;
+    }
+    .detail-box.open { display: block; }
+
+    .empty { text-align: center; padding: 60px 20px; color: #bbb; font-size: 14px; }
+
+    .auto-refresh { font-size: 11px; color: #999; display: flex; align-items: center; gap: 6px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #639922; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Headcheck — Debug Log</h1>
+  <div class="auto-refresh"><div class="dot"></div> Live</div>
+  <span class="count" id="count">0 entries</span>
+  <button id="btn-copy">Copy JSON</button>
+  <button class="danger" id="btn-clear">Clear</button>
+</div>
+
+<div class="filters" id="filters">
+  <button class="filter-btn active" data-type="all">All</button>
+  <button class="filter-btn" data-type="queued">Queued</button>
+  <button class="filter-btn" data-type="fetch_ok">Fetched</button>
+  <button class="filter-btn" data-type="fetch_error">Fetch errors</button>
+  <button class="filter-btn" data-type="llm_input">LLM input</button>
+  <button class="filter-btn" data-type="llm_output">LLM output</button>
+  <button class="filter-btn" data-type="llm_error">LLM errors</button>
+  <button class="filter-btn" data-type="parse_fail">Parse failures</button>
+  <button class="filter-btn" data-type="cache_hit">Cache hits</button>
+  <button class="filter-btn" data-type="badge_shown">Badge shown</button>
+  <button class="filter-btn" data-type="badge_skip">Badge skipped</button>
+</div>
+
+<div id="content">
+  <div class="empty" id="empty">No log entries yet. Browse a page with the extension active.</div>
+  <table id="table" style="display:none;">
+    <thead>
+      <tr>
+        <th style="width:80px;">Time</th>
+        <th style="width:110px;">Type</th>
+        <th>Headline</th>
+        <th>URL</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script src="debug.js"></script>
+</body>
+</html>

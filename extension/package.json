@@ -1,0 +1,13 @@
+{
+  "name": "clickbait-detector",
+  "version": "0.1.0",
+  "description": "Chrome extension that evaluates headline accuracy using a local LLM",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}
