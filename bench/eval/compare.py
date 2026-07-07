@@ -14,11 +14,10 @@ from collections import Counter
 
 
 SEVERITY = {
-    "BLATANT_BAIT": 5,
     "RAGEBAIT": 4,
     "CLICKBAIT": 3,
-    "MISLEADING": 2,
-    "UNDERSELLS": 1,
+    "INACCURATE": 2,
+    "UNDERDELIVERS": 1,
     "ACCURATE": 0
 }
 

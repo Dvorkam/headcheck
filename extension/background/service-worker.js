@@ -1,4 +1,4 @@
-import { callKobold, isKoboldReachable } from "./kobold.js";
+import { callLLM, checkServer } from "./llm-client.js";
 import { SYSTEM_PROMPT, buildUserMessage, parseResponse } from "../shared/prompt.js";
 import { logEvent, getLog, clearLog } from "./logger.js";
 
@@ -17,8 +17,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg.type === "CHECK_KOBOLD") {
-    isKoboldReachable().then(ok => sendResponse({ ok }));
+  if (msg.type === "CHECK_SERVER") {
+    checkServer().then(sendResponse);
     return true;
   }
 
@@ -83,11 +83,11 @@ async function handleEvaluate(url, headline, tabId) {
 
   let raw;
   try {
-    raw = await callKobold(SYSTEM_PROMPT, userMessage);
+    raw = await callLLM(SYSTEM_PROMPT, userMessage);
     await logEvent("llm_output", url, headline, raw);
   } catch (err) {
     await logEvent("llm_error", url, headline, err.message);
-    return { error: `KoboldCPP error: ${err.message}` };
+    return { error: `LLM server error: ${err.message}` };
   }
 
   // Parse
@@ -108,12 +108,10 @@ async function fetchArticleBody(url, tabId) {
   const u = new URL(url);
   if (u.hostname.includes("reddit.com")) return fetchRedditBody(u);
 
-  const cookies = await getSessionCookies(u.hostname);
+  // Anonymous fetch — deliberately no user cookies (privacy posture, Plan 04 §4).
   const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; clickbait-detector/0.1)",
-      ...(cookies ? { Cookie: cookies } : {})
-    }
+    credentials: "omit",
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; headcheck/0.1)" }
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -123,14 +121,13 @@ async function fetchArticleBody(url, tabId) {
 
 async function fetchRedditBody(u) {
   const jsonUrl = u.origin + u.pathname.replace(/\/?$/, ".json") + "?limit=1";
-  const cookies = await getSessionCookies("reddit.com");
 
+  // credentials: "include" rides the user's reddit session — host_permissions
+  // let the worker send cookies cross-origin. Reddit rate-limits anonymous
+  // API calls hard, so this is what makes deep-link fetches work.
   const res = await fetch(jsonUrl, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "clickbait-detector/0.1",
-      ...(cookies ? { Cookie: cookies } : {})
-    }
+    credentials: "include",
+    headers: { Accept: "application/json" }
   });
 
   if (!res.ok) throw new Error(`Reddit API ${res.status}`);
@@ -167,17 +164,6 @@ function stripTags(html) {
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/\s{2,}/g, " ").trim();
-}
-
-// ─── Cookie helper ────────────────────────────────────────────────────────────
-
-async function getSessionCookies(hostname) {
-  try {
-    const domain = hostname.replace(/^www\./, "");
-    const cookies = await chrome.cookies.getAll({ domain });
-    if (!cookies.length) return null;
-    return cookies.map(c => `${c.name}=${c.value}`).join("; ");
-  } catch (_) { return null; }
 }
 
 // ─── Cache ────────────────────────────────────────────────────────────────────

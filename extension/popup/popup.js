@@ -1,12 +1,11 @@
 // Popup script
 
 const CATEGORIES = {
-  BLATANT_BAIT: { label: "Blatant bait", color: "#2C2C2A", textColor: "#D3D1C7", barColor: "#2C2C2A" },
-  RAGEBAIT:     { label: "Ragebait",     color: "#FCEBEB", textColor: "#A32D2D", barColor: "#E24B4A" },
-  CLICKBAIT:    { label: "Clickbait",    color: "#FAEEDA", textColor: "#854F0B", barColor: "#EF9F27" },
-  MISLEADING:   { label: "Misleading",   color: "#F1EFE8", textColor: "#5F5E5A", barColor: "#888780", borderColor: "#B4B2A9" },
-  ACCURATE:     { label: "Accurate",     color: "#EAF3DE", textColor: "#3B6D11", barColor: "#97C459" },
-  UNDERSELLS:   { label: "Undersells",   color: "#F1EFE8", textColor: "#888780", barColor: "#B4B2A9" }
+  RAGEBAIT:      { label: "Ragebait",      color: "#FCEBEB", textColor: "#A32D2D", barColor: "#E24B4A" },
+  CLICKBAIT:     { label: "Clickbait",     color: "#FAEEDA", textColor: "#854F0B", barColor: "#EF9F27" },
+  INACCURATE:    { label: "Inaccurate",    color: "#FCF7DE", textColor: "#8A6D1D", barColor: "#E0C34A" },
+  UNDERDELIVERS: { label: "Underdelivers", color: "#F1EFE8", textColor: "#888780", barColor: "#B4B2A9", borderColor: "#B4B2A9" },
+  ACCURATE:      { label: "Accurate",      color: "#EAF3DE", textColor: "#3B6D11", barColor: "#97C459" }
 };
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -17,11 +16,11 @@ async function init() {
   const domain = tab?.url ? new URL(tab.url).hostname.replace("www.", "") : "—";
   document.getElementById("page-domain").textContent = domain;
 
-  // KoboldCPP status
-  const { ok } = await chrome.runtime.sendMessage({ type: "CHECK_KOBOLD" });
+  // LLM server status
+  const { ok, model } = await chrome.runtime.sendMessage({ type: "CHECK_SERVER" });
   const dot = document.getElementById("status-dot");
   dot.classList.add(ok ? "ok" : "err");
-  dot.title = ok ? "KoboldCPP connected" : "KoboldCPP unreachable — check Settings";
+  dot.title = ok ? `LLM server connected${model ? ` — ${model}` : ""}` : "LLM server unreachable — check Settings";
 
   // Site toggle state
   chrome.storage.sync.get({ disabledSites: [] }, r => {
@@ -55,7 +54,7 @@ function renderStats(stats) {
   const container = document.getElementById("stats-rows");
   const total = stats.total;
 
-  const order = ["BLATANT_BAIT", "RAGEBAIT", "CLICKBAIT", "MISLEADING", "ACCURATE", "UNDERSELLS"];
+  const order = ["RAGEBAIT", "CLICKBAIT", "INACCURATE", "UNDERDELIVERS", "ACCURATE"];
   const rows = order
     .filter(k => stats.byCategory[k])
     .map(k => {

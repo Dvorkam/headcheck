@@ -1,18 +1,22 @@
 """
-Offline benchmark runner — evaluates scraped headline/body pairs against KoboldCPP.
+Offline benchmark runner — evaluates scraped headline/body pairs against an
+OpenAI-compatible LLM server (llama.cpp llama-server; see server/ scripts).
 
-For each record in the input JSONL, calls KoboldCPP and records the parsed response.
-Designed to be run repeatedly with different models loaded in KoboldCPP.
+For each record in the input JSONL, calls the server and records the parsed
+response. Designed to be run repeatedly with different models loaded.
+
+The system prompt and response schema mirror extension/shared/prompt.js —
+keep them in sync manually.
 
 Usage:
     # Evaluate all scraped data with the currently loaded model
     python runner.py --input ../data/raw/reddit/reddit_collected.jsonl
 
     # Evaluate all sources, save results tagged with model name
-    python runner.py --all --model-name qwen2.5-1.5b
+    python runner.py --all --model-name qwen3.5-27b
 
-    # Evaluate only the curated hand-labeled test cases (the 10 from the widget)
-    python runner.py --input ../../test_cases.jsonl --model-name qwen2.5-0.5b
+    # Consistency testing (temperature 0 should agree; if not, that's signal)
+    python runner.py --input ../../test_cases.jsonl --runs 3
 """
 
 import argparse
@@ -20,127 +24,128 @@ import json
 import time
 from pathlib import Path
 from typing import Optional
-import re
 
 import requests
 
-KOBOLD_ENDPOINT = "http://localhost:5001"
+DEFAULT_ENDPOINT = "http://localhost:5001"
 
-SYSTEM_PROMPT = """You are a headline accuracy evaluator. Your job is to assess whether a news or article headline fairly represents the actual content of the article.
+VALID_CATEGORIES = {"RAGEBAIT", "CLICKBAIT", "INACCURATE", "ACCURATE", "UNDERDELIVERS"}
+
+SYSTEM_PROMPT = """You are a headline accuracy evaluator. Assess whether a news or article headline fairly represents the actual content of the article. Headlines and articles may be in English or Czech; always answer in the language of the headline.
 
 You will be given:
 - HEADLINE: the title shown to readers before clicking
-- BODY: the first few paragraphs of the actual article
+- BODY: the first part of the actual article
 
-Generate response in following format. Follow this structure exactly:
+Classify the headline as exactly one of:
+- RAGEBAIT: designed to enrage the reader; the article does not support the outrage the headline manufactures
+- CLICKBAIT: intentionally provocative oversell — the article exists but is far tamer or thinner than the headline implies
+- INACCURATE: slightly misleading; the framing, emphasis, or a withheld detail distorts what the article actually says
+- ACCURATE: the headline represents the article fairly
+- UNDERDELIVERS: the headline undersells an article that is genuinely more interesting or significant than it sounds
 
-READER EXPECTATION: What would a typical reader expect to find, based on the headline alone? Be specific about implied scale, subject, or drama.
+Respond with a JSON object with these fields, in this order:
+- reader_expectation: what a typical reader would expect from the headline alone — be specific about implied scale, subject, or drama
+- article_reality: what the article actually describes, noting key facts that differ from that expectation
+- gap_analysis: the most important information missing or misrepresented in the headline, and whether the omission looks deliberate
+- classification: one of the category tokens above
+- reason: one sentence explaining the classification
+- rewrite: a replacement headline that is accurate, specific, and still engaging — name the actual subject, no vague language"""
 
-ARTICLE REALITY: What does the article actually describe? Note any key facts that differ from expectations.
-
-GAP ANALYSIS: What is the most important information missing from or misrepresented in the headline? Is the omission likely deliberate?
-
-CLASSIFICATION: One of: BLATANT_BAIT / RAGEBAIT / CLICKBAIT / MISLEADING / ACCURATE / UNDERSELLS
-
-REASON: One sentence explaining the classification.
-
-REWRITE: A replacement headline that is accurate, specific, and still engaging."""
-
-VALID_CATEGORIES = {"BLATANT_BAIT", "RAGEBAIT", "CLICKBAIT", "MISLEADING", "ACCURATE", "UNDERSELLS"}
-
-
-# ─── KoboldCPP client ─────────────────────────────────────────────────────────
-
-def strip_think_blocks(text: str) -> str:
-    """Strip <think>...</think> blocks from reasoning models (Qwen3, etc.)"""
-    import re
-    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reader_expectation": {"type": "string"},
+        "article_reality": {"type": "string"},
+        "gap_analysis": {"type": "string"},
+        "classification": {"enum": sorted(VALID_CATEGORIES)},
+        "reason": {"type": "string"},
+        "rewrite": {"type": "string"},
+    },
+    "required": [
+        "reader_expectation", "article_reality", "gap_analysis",
+        "classification", "reason", "rewrite",
+    ],
+    "additionalProperties": False,
+}
 
 
-def call_kobold(headline: str, body: str, endpoint: str = KOBOLD_ENDPOINT) -> Optional[str]:
-    """Call KoboldCPP and return raw text output. Tries chat completions first."""
+# ─── LLM client ───────────────────────────────────────────────────────────────
+
+def call_llm(headline: str, body: str, endpoint: str = DEFAULT_ENDPOINT) -> Optional[str]:
+    """Call the server's chat completions endpoint; returns raw text output."""
     truncated = body[:2000] if len(body) > 2000 else body
     user_msg = f"HEADLINE: {headline}\n\nBODY:\n{truncated}"
 
-    # Try OpenAI-compatible chat completions
     try:
         resp = requests.post(
             f"{endpoint}/v1/chat/completions",
             json={
-                "model": "local",
+                "model": "headcheck",
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_msg}
+                    {"role": "user", "content": user_msg},
                 ],
-                "max_tokens": 1200,  # Thinking models burn 400-600 tokens on <think> blocks
-                "temperature": 0.3,
-                "reasoning_effort": "none",
+                "max_tokens": 600,
+                "temperature": 0,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "headline_verdict",
+                        "strict": True,
+                        "schema": RESPONSE_SCHEMA,
+                    },
+                },
             },
-            timeout=90
-        )
-        if resp.ok:
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            return strip_think_blocks(raw)
-    except Exception:
-        pass
-
-    # Fallback: native KoboldCPP generate API
-    prompt = f"### System:\n{SYSTEM_PROMPT}\n\n### User:\n{user_msg}\n\n### Response:\n"
-    try:
-        resp = requests.post(
-            f"{endpoint}/api/v1/generate",
-            json={
-                "prompt": prompt,
-                "max_length": 1200,
-                "temperature": 0.3,
-                "rep_pen": 1.1,
-                "stop_sequence": ["\n\n\n", "###"],
-                "reasoning_effort": "none"
-            },
-            timeout=90
+            timeout=180,
         )
         resp.raise_for_status()
-        return strip_think_blocks(resp.json()["results"][0]["text"].strip())
+        return resp.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        print(f"    KoboldCPP error: {e}")
+        print(f"    LLM server error: {e}")
         return None
 
 
 def get_model_name(endpoint: str) -> str:
-    """Ask KoboldCPP what model is loaded."""
+    """Ask the server what model is loaded (standard /v1/models)."""
     try:
-        resp = requests.get(f"{endpoint}/api/v1/model", timeout=5)
-        return resp.json().get("result", "unknown")
+        resp = requests.get(f"{endpoint}/v1/models", timeout=5)
+        return resp.json()["data"][0]["id"]
     except Exception:
         return "unknown"
 
 
 # ─── Response parsing ─────────────────────────────────────────────────────────
 
-def extract_field(text: str, field: str) -> Optional[str]:
-    pattern = rf"{field}\s*:\s*([\s\S]*?)(?=\n[A-Z _]+:|$)"
-    m = re.search(pattern, text, re.IGNORECASE)
-    return m.group(1).strip() if m else None
-
-
 def parse_response(raw: str) -> dict:
+    """Parse the JSON verdict. Lenient about surrounding text."""
     result = {
-        "reader_expectation": extract_field(raw, "READER EXPECTATION"),
-        "article_reality": extract_field(raw, "ARTICLE REALITY"),
-        "gap_analysis": extract_field(raw, "GAP ANALYSIS"),
+        "reader_expectation": None,
+        "article_reality": None,
+        "gap_analysis": None,
         "classification": None,
-        "reason": extract_field(raw, "REASON"),
-        "rewrite": extract_field(raw, "REWRITE"),
+        "reason": None,
+        "rewrite": None,
         "raw": raw,
-        "parse_ok": False
+        "parse_ok": False,
     }
-    m = re.search(
-        r"CLASSIFICATION\s*:\s*(BLATANT_BAIT|RAGEBAIT|CLICKBAIT|MISLEADING|ACCURATE|UNDERSELLS)",
-        raw, re.IGNORECASE
-    )
-    if m:
-        result["classification"] = m.group(1).upper()
-        result["parse_ok"] = True
+
+    start, end = raw.find("{"), raw.rfind("}")
+    if start == -1 or end <= start:
+        return result
+    try:
+        obj = json.loads(raw[start:end + 1])
+    except json.JSONDecodeError:
+        return result
+
+    classification = str(obj.get("classification", "")).upper()
+    if classification not in VALID_CATEGORIES:
+        return result
+
+    for field in ("reader_expectation", "article_reality", "gap_analysis", "reason", "rewrite"):
+        result[field] = obj.get(field)
+    result["classification"] = classification
+    result["parse_ok"] = True
     return result
 
 
@@ -150,7 +155,7 @@ def evaluate_file(
     input_path: Path,
     output_path: Path,
     model_name: str,
-    endpoint: str = KOBOLD_ENDPOINT,
+    endpoint: str = DEFAULT_ENDPOINT,
     delay: float = 0.5,
     runs: int = 1
 ):
@@ -185,7 +190,7 @@ def evaluate_file(
 
         run_results = []
         for run in range(runs):
-            raw = call_kobold(headline, body, endpoint)
+            raw = call_llm(headline, body, endpoint)
             if raw:
                 parsed = parse_response(raw)
                 run_results.append(parsed)
@@ -241,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", help="Path to input JSONL file")
     parser.add_argument("--all", action="store_true", help="Evaluate all scraped files")
     parser.add_argument("--model-name", default=None, help="Label for the model being tested")
-    parser.add_argument("--endpoint", default=KOBOLD_ENDPOINT)
+    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     parser.add_argument("--runs", type=int, default=1, help="Evaluation runs per record (use 3 for consistency testing)")
     parser.add_argument("--delay", type=float, default=0.5)
     args = parser.parse_args()

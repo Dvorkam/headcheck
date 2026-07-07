@@ -21,17 +21,16 @@
 <body>
   <h1>Clickbait Detector</h1>
 
-  <label for="endpoint">KoboldCPP endpoint</label>
+  <label for="endpoint">LLM server endpoint (llama-server)</label>
   <input type="text" id="endpoint" placeholder="http://localhost:5001" />
   <div class="status" id="endpoint-status"></div>
 
   <label for="threshold">Minimum severity to show badge</label>
   <select id="threshold">
-    <option value="1">Undersells and above (all)</option>
-    <option value="2" selected>Misleading and above</option>
+    <option value="1">Underdelivers and above (all)</option>
+    <option value="2" selected>Inaccurate and above</option>
     <option value="3">Clickbait and above</option>
-    <option value="4">Ragebait and above</option>
-    <option value="5">Blatant bait only</option>
+    <option value="4">Ragebait only</option>
   </select>
 
   <hr>

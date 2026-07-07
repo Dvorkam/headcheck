@@ -1,49 +1,45 @@
-// Shared category definitions — used by both the extension UI and the bench eval runner.
-// Keep this file in sync with bench/eval/categories.py
+// Shared category definitions — the single source of truth for the taxonomy.
+// Mirrored in: content/scanner.js (inlined — MV3 content scripts can't import),
+// popup/popup.js, bench/eval/runner.py, bench/eval/compare.py.
+// This taxonomy feeds the training corpus (see .claude/Plan/01) — changing it
+// after labeling starts means relabeling.
 
 export const CATEGORIES = {
-  BLATANT_BAIT: {
-    label: "Blatant bait",
-    color: "#2C2C2A",
-    textColor: "#D3D1C7",
-    description: "No information, pure curiosity gap",
-    severity: 5
-  },
   RAGEBAIT: {
     label: "Ragebait",
     color: "#FCEBEB",
     textColor: "#A32D2D",
-    description: "Accurate facts, engineered emotional framing",
+    description: "Designed to enrage; the article does not support the outrage",
     severity: 4
   },
   CLICKBAIT: {
     label: "Clickbait",
     color: "#FAEEDA",
     textColor: "#854F0B",
-    description: "Information present but scale wildly overstated",
+    description: "Intentionally provocative oversell of the actual content",
     severity: 3
   },
-  MISLEADING: {
-    label: "Misleading",
-    color: "#F1EFE8",
-    textColor: "#5F5E5A",
-    borderColor: "#B4B2A9",
-    description: "Technically accurate, key context withheld",
+  INACCURATE: {
+    label: "Inaccurate",
+    color: "#FCF7DE",
+    textColor: "#8A6D1D",
+    description: "Slightly misleading; framing or emphasis distorts the article",
     severity: 2
+  },
+  UNDERDELIVERS: {
+    label: "Underdelivers",
+    color: "#F1EFE8",
+    textColor: "#888780",
+    borderColor: "#B4B2A9",
+    description: "Headline undersells a genuinely interesting article",
+    severity: 1
   },
   ACCURATE: {
     label: "Accurate",
     color: "#EAF3DE",
     textColor: "#3B6D11",
-    description: "Fair representation of article content",
+    description: "Headline represents the article fairly",
     severity: 0
-  },
-  UNDERSELLS: {
-    label: "Undersells",
-    color: "#F1EFE8",
-    textColor: "#888780",
-    description: "Buries genuinely important information",
-    severity: 1
   }
 };
 
@@ -52,5 +48,4 @@ export const CATEGORIES = {
 export const DEFAULT_SEVERITY_THRESHOLD = 2;
 
 // Category tokens the LLM is expected to output.
-// Order matters: parser tries these in sequence.
 export const VALID_TOKENS = Object.keys(CATEGORIES);

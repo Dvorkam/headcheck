@@ -2,9 +2,9 @@ const $ = id => document.getElementById(id);
 
 // Load saved settings
 chrome.storage.sync.get(
-  { koboldEndpoint: "http://localhost:5001", severityThreshold: 2, sites: { reddit: true, seznam: true, hn: true } },
+  { serverEndpoint: "http://localhost:5001", severityThreshold: 2, sites: { reddit: true, seznam: true, hn: true } },
   r => {
-    $("endpoint").value = r.koboldEndpoint;
+    $("endpoint").value = r.serverEndpoint;
     $("threshold").value = r.severityThreshold;
     $("site-reddit").checked = r.sites.reddit;
     $("site-seznam").checked = r.sites.seznam;
@@ -19,17 +19,17 @@ $("endpoint").addEventListener("blur", async () => {
   status.textContent = "Checking…";
   status.className = "status";
   try {
-    const res = await fetch(`${url}/api/v1/model`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${url}/v1/models`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
       const data = await res.json();
-      status.textContent = `Connected — model: ${data.result || "unknown"}`;
+      status.textContent = `Connected — model: ${data.data?.[0]?.id || "unknown"}`;
       status.className = "status ok";
     } else {
       status.textContent = `Reachable but returned ${res.status}`;
       status.className = "status err";
     }
   } catch {
-    status.textContent = "Could not reach KoboldCPP at this address";
+    status.textContent = "Could not reach the LLM server at this address";
     status.className = "status err";
   }
 });
@@ -37,7 +37,7 @@ $("endpoint").addEventListener("blur", async () => {
 // Save
 $("save").addEventListener("click", () => {
   chrome.storage.sync.set({
-    koboldEndpoint: $("endpoint").value.trim(),
+    serverEndpoint: $("endpoint").value.trim(),
     severityThreshold: parseInt($("threshold").value),
     sites: {
       reddit: $("site-reddit").checked,

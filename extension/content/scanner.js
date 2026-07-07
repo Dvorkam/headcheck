@@ -9,12 +9,11 @@
 // ─── Inlined category definitions ────────────────────────────────────────────
 
 const CATEGORIES = {
-  BLATANT_BAIT: { label: "Blatant bait", color: "#2C2C2A", textColor: "#D3D1C7", severity: 5 },
-  RAGEBAIT:     { label: "Ragebait",     color: "#FCEBEB", textColor: "#A32D2D", severity: 4 },
-  CLICKBAIT:    { label: "Clickbait",    color: "#FAEEDA", textColor: "#854F0B", severity: 3 },
-  MISLEADING:   { label: "Misleading",   color: "#F1EFE8", textColor: "#5F5E5A", borderColor: "#B4B2A9", severity: 2 },
-  ACCURATE:     { label: "Accurate",     color: "#EAF3DE", textColor: "#3B6D11", severity: 0 },
-  UNDERSELLS:   { label: "Undersells",   color: "#F1EFE8", textColor: "#888780", severity: 1 }
+  RAGEBAIT:      { label: "Ragebait",      color: "#FCEBEB", textColor: "#A32D2D", severity: 4 },
+  CLICKBAIT:     { label: "Clickbait",     color: "#FAEEDA", textColor: "#854F0B", severity: 3 },
+  INACCURATE:    { label: "Inaccurate",    color: "#FCF7DE", textColor: "#8A6D1D", severity: 2 },
+  UNDERDELIVERS: { label: "Underdelivers", color: "#F1EFE8", textColor: "#888780", borderColor: "#B4B2A9", severity: 1 },
+  ACCURATE:      { label: "Accurate",      color: "#EAF3DE", textColor: "#3B6D11", severity: 0 }
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────

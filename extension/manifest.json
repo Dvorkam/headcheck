@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Clickbait Detector",
+  "name": "Headcheck",
   "version": "0.1.0",
-  "description": "Evaluates headline accuracy using a local LLM via KoboldCPP.",
+  "description": "Evaluates headline accuracy using a local LLM (llama.cpp server).",
 
   "permissions": [
-    "cookies",
     "storage",
     "scripting",
     "contextMenus"
