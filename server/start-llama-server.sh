@@ -10,7 +10,7 @@ set -euo pipefail
 LLAMA_SERVER="${LLAMA_SERVER:-llama-server}"
 MODEL="${HEADCHECK_MODEL:-$HOME/models/Qwen3.5-27B-UD-Q5_K_XL.gguf}"
 HOST="${HEADCHECK_HOST:-127.0.0.1}"
-PORT="${HEADCHECK_PORT:-5001}"      # matches the extension's default endpoint
+PORT="${HEADCHECK_PORT:-37848}"      # matches the extension's default endpoint
 CTX="${HEADCHECK_CTX:-16384}"       # total; split across parallel slots
 
 if [[ ! -f "$MODEL" ]]; then
